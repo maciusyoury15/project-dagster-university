@@ -2,6 +2,7 @@ import dagster as dg
 from dagster_duckdb import DuckDBResource
 import pandas as pd
 
+import pandas
 import requests
 from dagster_essentials.defs.assets import constants
 from dagster_essentials.defs.partitions import monthly_partition
@@ -32,6 +33,8 @@ def taxi_trips_file(context: dg.AssetExecutionContext) -> dg.MaterializeResult:
             'Number of records': dg.MetadataValue.int(num_rows)
         }
     )
+
+
 
 
 @dg.asset(
