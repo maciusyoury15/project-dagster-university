@@ -55,7 +55,7 @@ def manhattan_map() -> None:
     # Save the image
     plt.savefig(constants.MANHATTAN_MAP_FILE_PATH, format="png", bbox_inches="tight")
     plt.close(fig)
-
+    
 
 @dg.asset(
     deps=["taxi_trips"],
