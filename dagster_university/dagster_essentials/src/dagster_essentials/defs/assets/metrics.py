@@ -60,11 +60,12 @@ def manhattan_map() -> None:
 @dg.asset(
     deps=["taxi_trips"],
     partitions_def=weekly_partition,
+    description="Weekly aggregated taxi trips dataset, loaded into a CSV file, partitioned by week.",
     group_name="metrics"
 )
 def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
     """
-      The weekly aggregated taxi trips dataset, loaded into a CSV file, partitioned by week.
+      The weekly aggregated taxi trips dataset, loaded into a CSV file, partitioned by week.    # Will not be used cause of description in asset decorator.
     """
 
     period_to_fetch = context.partition_key
