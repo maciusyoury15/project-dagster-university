@@ -11,7 +11,8 @@ from dagster_essentials.defs.partitions import weekly_partition
 
 
 @dg.asset(
-    deps=["taxi_trips", "taxi_zones"]
+    deps=["taxi_trips", "taxi_zones"],
+    group_name="metrics"
 )
 def manhattan_stats(database: DuckDBResource) -> None:
     query = """
@@ -39,6 +40,7 @@ def manhattan_stats(database: DuckDBResource) -> None:
 # src/dagster_essentials/defs/assets/metrics.py
 @dg.asset(
     deps=["manhattan_stats"],
+    group_name="metrics"
 )
 def manhattan_map() -> None:
     trips_by_zone = gpd.read_file(constants.MANHATTAN_STATS_FILE_PATH)
@@ -57,7 +59,8 @@ def manhattan_map() -> None:
 
 @dg.asset(
     deps=["taxi_trips"],
-    partitions_def=weekly_partition
+    partitions_def=weekly_partition,
+    group_name="metrics"
 )
 def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
     """

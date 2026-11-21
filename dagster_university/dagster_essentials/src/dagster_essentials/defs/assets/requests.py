@@ -23,8 +23,8 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
       The response to an ad-hoc request made in the `requests` directory.
       See `requests/README.md` for more information.
     """
-
-    file_path = constants.ADHOC_REQUEST_FILE_PATH_TEMPLATE.format(config.filename.split(".")[0])
+    
+    file_path = constants.REQUEST_DESTINATION_TEMPLATE_FILE_PATH.format(config.filename.split(".")[0])
 
     query = f"""
         select
@@ -61,6 +61,8 @@ def adhoc_request(config: AdhocRequestConfig, database: DuckDBResource) -> None:
 
     # Pivot data for stacked bar chart
     results_pivot = results.pivot(index="hour_of_day", columns="day_of_week", values="num_trips")
+    day_order = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    results_pivot = results_pivot.reindex(columns=day_order).fillna(0)
     results_pivot.plot(kind="bar", stacked=True, ax=ax, colormap="viridis")
 
     ax.set_title(f"Number of trips by hour of day in {config.borough}, from {config.start_date} to {config.end_date}")
