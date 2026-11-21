@@ -1,19 +1,19 @@
+from datetime import datetime, timedelta
+
 import dagster as dg
-
-import matplotlib.pyplot as plt
+from dagster_duckdb import DuckDBResource
 import geopandas as gpd
-
-import duckdb
-import os
+import pandas as pd
+import matplotlib.pyplot as plt
 
 from dagster_essentials.defs.assets import constants
-from dagster._utils.backoff import backoff
+from dagster_essentials.defs.partitions import weekly_partition
 
 
 @dg.asset(
     deps=["taxi_trips", "taxi_zones"]
 )
-def manhattan_stats() -> None:
+def manhattan_stats(database: DuckDBResource) -> None:
     query = """
         select
             zones.zone,
@@ -26,8 +26,8 @@ def manhattan_stats() -> None:
         group by zone, borough, geometry
     """
 
-    conn = duckdb.connect(os.getenv("DUCKDB_DATABASE"))
-    trips_by_zone = conn.execute(query).fetchdf()
+    with database.get_connection() as conn:
+        trips_by_zone = conn.execute(query).fetchdf()
 
     trips_by_zone["geometry"] = gpd.GeoSeries.from_wkt(trips_by_zone["geometry"])
     trips_by_zone = gpd.GeoDataFrame(trips_by_zone)
@@ -57,31 +57,39 @@ def manhattan_map() -> None:
 
 @dg.asset(
     deps=["taxi_trips"],
+    partitions_def=weekly_partition
 )
-def trips_by_week() -> None:
-    conn = backoff(
-        fn=duckdb.connect,
-        retry_on=(RuntimeError, duckdb.IOException),
-        kwargs={
-            "database": os.getenv("DUCKDB_DATABASE"),
-        },
-        max_retries=10,
-    )
+def trips_by_week(context: dg.AssetExecutionContext, database: DuckDBResource) -> None:
+    """
+      The weekly aggregated taxi trips dataset, loaded into a CSV file, partitioned by week.
+    """
 
-    query = """
+    period_to_fetch = context.partition_key
+
+    query = f"""
+    select
+        period_to_fetch, *
+    from (
         select
-            date_trunc('week', pickup_datetime + interval '1 day')::date - 1 as period,
             count(vendor_id)                  as num_trips,
             round(sum(total_amount), 2)       as total_amount,
             round(sum(trip_distance), 2)      as trip_distance,
             sum(passenger_count)::int         as passenger_count
         from trips
-        where pickup_datetime >= '2023-03-05'
-          and pickup_datetime <  '2023-04-02'
-        group by 1
-        order by 1
+        where pickup_datetime >= '{period_to_fetch}'        
+          and pickup_datetime <  '{period_to_fetch}'::date + interval '1 week'
+    ) cross join (select '{period_to_fetch}' as period_to_fetch)
     """
-    trips_by_week = conn.execute(query).fetchdf()
 
-    with open(constants.TRIPS_BY_WEEK_FILE_PATH, "w") as output_file:
-        output_file.write(trips_by_week.to_csv(index=False))
+    with database.get_connection() as conn:
+        trips_by_week = conn.execute(query).fetchdf()
+
+    try:
+        # If the file already exists, append to it, but replace the existing month's data
+        existing_data = pd.read_csv(constants.TRIPS_BY_WEEK_FILE_PATH)
+        existing_data = existing_data[existing_data["period_to_fetch"] != period_to_fetch]
+        existing_data = pd.concat([existing_data, trips_by_week]).sort_values(by="period_to_fetch")
+        existing_data.to_csv(constants.TRIPS_BY_WEEK_FILE_PATH, index=False)
+    except FileNotFoundError:
+        # If the file doesn't exist, create it with the current data
+        trips_by_week.to_csv(constants.TRIPS_BY_WEEK_FILE_PATH, index=False)
