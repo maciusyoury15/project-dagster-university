@@ -13,4 +13,6 @@ weekly_partition = dg.WeeklyPartitionsDefinition(
     start_date=start_date, end_date=end_date
 )
 
-daily_partition = dg.DailyPartitionsDefinition(start_date=start_date, end_date=end_date)
+daily_partition = dg.DailyPartitionsDefinition(
+    start_date=start_date, end_date=end_date
+)
